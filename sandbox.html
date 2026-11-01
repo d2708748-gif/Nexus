@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nexus — Песочница</title>
+
+<!-- CodeMirror 5 (подсветка синтаксиса). Если CDN недоступен — редактор автоматически станет обычным текстовым полем. -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+
+<style>
+  :root {
+    --bg: #090612;
+    --panel: #100a1f;
+    --panel-2: #160e2b;
+    --line: #2b1f4d;
+    --text: #ebe7ff;
+    --dim: #8c83bb;
+    --cyan: #18f0ff;
+    --magenta: #ff2bd6;
+    --lime: #b6ff3b;
+    --amber: #ffb02e;
+    --red: #ff4d6d;
+    --mono: ui-monospace, "Cascadia Code", "JetBrains Mono", "Fira Code", Consolas, Menlo, monospace;
+    --sans: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+
+  body {
+    background:
+      radial-gradient(900px 420px at 8% -10%, rgba(255, 43, 214, .14), transparent 60%),
+      radial-gradient(900px 420px at 100% 0%, rgba(24, 240, 255, .12), transparent 60%),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    display: flex;
+    flex-direction: column;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* ---------- Верхняя панель ---------- */
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(16, 10, 31, .85);
+    flex-wrap: wrap;
+  }
+  .brand {
+    font-family: var(--mono);
+    font-size: 15px;
+    letter-spacing: .04em;
+    color: var(--dim);
+    display: flex; align-items: center; gap: 8px;
+    margin-right: auto;
+  }
+  .brand b {
+    color: var(--cyan);
+    font-weight: 700;
+    text-shadow: 0 0 10px rgba(24, 240, 255, .7);
+  }
+  .brand .slash { color: var(--magenta); text-shadow: 0 0 8px rgba(255, 43, 214, .7); }
+  .brand .page { color: var(--text); font-family: var(--sans); font-size: 16px; font-weight: 600; letter-spacing: 0; }
+
+  .actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-weight: 600;
+    font-size: 14px;
+    transition: box-shadow .15s ease, background .15s ease, transform .05s ease;
+  }
+  button:active { transform: translateY(1px); }
+  button:focus-visible, .switch input:focus-visible + .track {
+    outline: 2px solid var(--lime);
+    outline-offset: 2px;
+  }
+
+  .btn-run {
+    background: rgba(24, 240, 255, .12);
+    color: var(--cyan);
+    border: 1px solid var(--cyan);
+    box-shadow: 0 0 12px rgba(24, 240, 255, .35), inset 0 0 12px rgba(24, 240, 255, .12);
+    text-shadow: 0 0 8px rgba(24, 240, 255, .8);
+  }
+  .btn-run:hover { background: rgba(24, 240, 255, .22); box-shadow: 0 0 20px rgba(24, 240, 255, .6), inset 0 0 14px rgba(24, 240, 255, .2); }
+
+  .btn-clear {
+    background: transparent;
+    color: var(--magenta);
+    border: 1px solid rgba(255, 43, 214, .6);
+  }
+  .btn-clear:hover { background: rgba(255, 43, 214, .12); box-shadow: 0 0 14px rgba(255, 43, 214, .4); }
+
+  /* переключатель «Авто» */
+  .switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--dim); cursor: pointer; user-select: none; }
+  .switch input { position: absolute; opacity: 0; pointer-events: none; }
+  .track {
+    width: 34px; height: 18px; border-radius: 999px;
+    background: var(--panel-2); border: 1px solid var(--line);
+    position: relative; transition: background .15s, border-color .15s;
+  }
+  .track::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--dim); transition: transform .15s, background .15s;
+  }
+  .switch input:checked + .track { border-color: var(--lime); background: rgba(182, 255, 59, .12); }
+  .switch input:checked + .track::after { transform: translateX(16px); background: var(--lime); box-shadow: 0 0 8px var(--lime); }
+
+  /* ---------- Вкладки для узких экранов ---------- */
+  .tabs { display: none; border-bottom: 1px solid var(--line); background: var(--panel); }
+  .tabs button {
+    flex: 1; border: 0; border-radius: 0; background: transparent;
+    color: var(--dim); padding: 11px 0; border-bottom: 2px solid transparent;
+  }
+  .tabs button.on { color: var(--cyan); border-bottom-color: var(--cyan); text-shadow: 0 0 8px rgba(24, 240, 255, .7); }
+
+  /* ---------- Рабочая область ---------- */
+  .work {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: var(--left, 1fr) 10px 1fr;
+    padding: 14px 18px 8px;
+  }
+  .pane {
+    min-width: 0; min-height: 0;
+    display: flex; flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .pane:focus-within { border-color: rgba(24, 240, 255, .55); box-shadow: 0 0 18px rgba(24, 240, 255, .15); }
+  #pane-preview { border-color: var(--line); }
+  #pane-preview.live { border-color: rgba(255, 43, 214, .5); box-shadow: 0 0 18px rgba(255, 43, 214, .14); }
+
+  .pane-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 14px;
+    font-size: 13px; color: var(--dim);
+    border-bottom: 1px solid var(--line);
+    background: var(--panel-2);
+  }
+  .dots { display: flex; gap: 6px; }
+  .dots i { width: 9px; height: 9px; border-radius: 50%; display: block; }
+  .dots i:nth-child(1) { background: var(--magenta); box-shadow: 0 0 6px var(--magenta); }
+  .dots i:nth-child(2) { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+  .dots i:nth-child(3) { background: var(--lime); box-shadow: 0 0 6px var(--lime); }
+  .pane-title { font-family: var(--mono); }
+
+  .editor-wrap { flex: 1; min-height: 0; position: relative; }
+
+  /* Разделитель */
+  .split {
+    cursor: col-resize; position: relative; touch-action: none;
+  }
+  .split::after {
+    content: ""; position: absolute; top: 50%; left: 3px;
+    width: 4px; height: 46px; transform: translateY(-50%);
+    border-radius: 4px; background: var(--line); transition: background .15s, box-shadow .15s;
+  }
+  .split:hover::after, .split.drag::after { background: var(--magenta); box-shadow: 0 0 10px var(--magenta); }
+
+  /* Предпросмотр */
+  #frame {
+    flex: 1; min-height: 0; width: 100%; border: 0;
+    background: #fff; /* чтобы было видно, как страница выглядит «сама по себе» */
+  }
+
+  /* ---------- Статус ---------- */
+  .status {
+    display: flex; gap: 14px; align-items: center;
+    padding: 6px 18px 12px;
+    font-family: var(--mono); font-size: 12px; color: var(--dim);
+    min-height: 34px;
+  }
+  .status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); }
+  .status.ok .dot { background: var(--lime); box-shadow: 0 0 8px var(--lime); }
+  .status.err { color: var(--red); }
+  .status.err .dot { background: var(--red); box-shadow: 0 0 8px var(--red); }
+  .status .hint { margin-left: auto; }
+
+  /* ---------- CodeMirror: неоновая тема ---------- */
+  .CodeMirror {
+    height: 100%;
+    background: transparent;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  .CodeMirror-gutters { background: transparent; border-right: 1px solid var(--line); }
+  .CodeMirror-linenumber { color: #4d4177; }
+  .CodeMirror-cursor { border-left: 2px solid var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+  .CodeMirror-selected, .CodeMirror-focused .CodeMirror-selected { background: rgba(255, 43, 214, .25); }
+  .CodeMirror-activeline-background { background: rgba(24, 240, 255, .05); }
+  .CodeMirror-matchingbracket { color: var(--lime) !important; border-bottom: 1px solid var(--lime); }
+  .CodeMirror-nonmatchingbracket { color: var(--red) !important; }
+  .CodeMirror-scroll { padding-bottom: 8px; }
+
+  .cm-s-nexus .cm-tag      { color: var(--magenta); }
+  .cm-s-nexus .cm-bracket  { color: #a592e8; }
+  .cm-s-nexus .cm-attribute{ color: var(--cyan); }
+  .cm-s-nexus .cm-string   { color: var(--lime); }
+  .cm-s-nexus .cm-string-2 { color: var(--lime); }
+  .cm-s-nexus .cm-keyword  { color: var(--magenta); }
+  .cm-s-nexus .cm-atom,
+  .cm-s-nexus .cm-number   { color: var(--amber); }
+  .cm-s-nexus .cm-def,
+  .cm-s-nexus .cm-variable-2 { color: var(--cyan); }
+  .cm-s-nexus .cm-variable { color: var(--text); }
+  .cm-s-nexus .cm-property { color: #7fd8ff; }
+  .cm-s-nexus .cm-operator { color: #c9b8ff; }
+  .cm-s-nexus .cm-comment  { color: #6a5f9a; font-style: italic; }
+  .cm-s-nexus .cm-builtin  { color: var(--amber); }
+  .cm-s-nexus .cm-meta     { color: var(--dim); }
+
+  /* Запасной вариант без CodeMirror */
+  textarea.fallback {
+    width: 100%; height: 100%; resize: none; border: 0; outline: 0;
+    background: transparent; color: var(--text);
+    font-family: var(--mono); font-size: 14px; line-height: 1.55;
+    padding: 12px 14px; tab-size: 2;
+  }
+
+  /* ---------- Адаптив ---------- */
+  @media (max-width: 760px) {
+    .bar { padding: 10px 12px; gap: 10px; }
+    .tabs { display: flex; }
+    .work { grid-template-columns: 1fr; padding: 10px 12px 6px; }
+    .split { display: none; }
+    .work .pane { display: none; }
+    .work[data-view="code"] #pane-code { display: flex; }
+    .work[data-view="view"] #pane-preview { display: flex; }
+    .status { padding: 6px 12px 10px; }
+    .status .hint { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+
+<body>
+<div id="nexus-sandbox" style="display:contents">
+
+  <header class="bar">
+    <div class="brand"><b>NEXUS</b><span class="slash">/</span><span class="page">Песочница</span></div>
+    <div class="actions">
+      <label class="switch" title="Перезапускать код автоматически при наборе">
+        <input type="checkbox" id="auto">
+        <span class="track"></span>
+        Авто
+      </label>
+      <button class="btn-clear" id="btn-clear" type="button">Очистить</button>
+      <button class="btn-run" id="btn-run" type="button">▶ Запустить код</button>
+    </div>
+  </header>
+
+  <nav class="tabs" aria-label="Режим просмотра">
+    <button type="button" id="tab-code" class="on">Код</button>
+    <button type="button" id="tab-view">Результат</button>
+  </nav>
+
+  <main class="work" id="work" data-view="code">
+    <section class="pane" id="pane-code">
+      <div class="pane-head">
+        <div class="dots" aria-hidden="true"><i></i><i></i><i></i></div>
+        <span class="pane-title">index.html</span>
+      </div>
+      <div class="editor-wrap" id="editor-wrap"></div>
+    </section>
+
+    <div class="split" id="split" role="separator" aria-orientation="vertical" aria-label="Изменить ширину панелей"></div>
+
+    <section class="pane" id="pane-preview">
+      <div class="pane-head">
+        <div class="dots" aria-hidden="true"><i></i><i></i><i></i></div>
+        <span class="pane-title">Предпросмотр</span>
+      </div>
+      <iframe id="frame" title="Результат выполнения кода"
+              sandbox="allow-scripts allow-modals allow-forms allow-popups"></iframe>
+    </section>
+  </main>
+
+  <footer class="status" id="status">
+    <span class="dot"></span>
+    <span id="status-text">Готово к запуску</span>
+    <span class="hint">Ctrl + Enter — запустить</span>
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closetag.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- Пример кода ---------- */
+  var EXAMPLE = [
+    '<!DOCTYPE html>',
+    '<html>',
+    '<head>',
+    '<style>',
+    '  body {',
+    '    margin: 0;',
+    '    height: 100vh;',
+    '    background: #0d0a1a;',
+    '    color: #fff;',
+    '    font-family: sans-serif;',
+    '    display: flex;',
+    '    flex-direction: column;',
+    '    align-items: center;',
+    '    justify-content: center;',
+    '    gap: 24px;',
+    '  }',
+    '  #track {',
+    '    position: relative;',
+    '    width: 280px;',
+    '    height: 70px;',
+    '    border-bottom: 2px solid #333;',
+    '  }',
+    '  #box {',
+    '    position: absolute;',
+    '    left: 0;',
+    '    bottom: 2px;',
+    '    width: 60px;',
+    '    height: 60px;',
+    '    background: red;',
+    '    border-radius: 6px;',
+    '    transition: left .5s ease;',
+    '  }',
+    '  button {',
+    '    padding: 10px 20px;',
+    '    font-size: 16px;',
+    '    cursor: pointer;',
+    '    border: 0;',
+    '    border-radius: 8px;',
+    '  }',
+    '</style>',
+    '</head>',
+    '<body>',
+    '  <div id="track"><div id="box"></div></div>',
+    '  <button id="go">Подвинуть квадрат</button>',
+    '',
+    '  <script>',
+    '    var box = document.getElementById("box");',
+    '    var right = false;',
+    '',
+    '    document.getElementById("go").onclick = function () {',
+    '      right = !right;',
+    '      box.style.left = right ? "220px" : "0px";',
+    '    };',
+    '  <\/script>',
+    '</body>',
+    '</html>'
+  ].join('\n');
+
+  /* ---------- Элементы ---------- */
+  var $ = function (id) { return document.getElementById(id); };
+  var frame = $('frame');
+  var statusBar = $('status');
+  var statusText = $('status-text');
+  var work = $('work');
+  var autoBox = $('auto');
+  var previewPane = $('pane-preview');
+
+  /* ---------- Редактор ---------- */
+  var cm = null;
+  var ta = null;
+
+  if (window.CodeMirror) {
+    cm = CodeMirror($('editor-wrap'), {
+      value: EXAMPLE,
+      mode: 'htmlmixed',
+      theme: 'nexus',
+      lineNumbers: true,
+      tabSize: 2,
+      indentUnit: 2,
+      indentWithTabs: false,
+      lineWrapping: true,
+      matchBrackets: true,
+      autoCloseBrackets: true,
+      autoCloseTags: true,
+      styleActiveLine: true,
+      extraKeys: {
+        'Ctrl-Enter': run,
+        'Cmd-Enter': run,
+        Tab: function (c) {
+          if (c.somethingSelected()) c.indentSelection('add');
+          else c.replaceSelection('  ', 'end');
+        }
+      }
+    });
+  } else {
+    // CDN недоступен — обычное текстовое поле
+    ta = document.createElement('textarea');
+    ta.className = 'fallback';
+    ta.spellcheck = false;
+    ta.value = EXAMPLE;
+    ta.addEventListener('keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); run(); }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        var s = ta.selectionStart;
+        ta.value = ta.value.slice(0, s) + '  ' + ta.value.slice(ta.selectionEnd);
+        ta.selectionStart = ta.selectionEnd = s + 2;
+      }
+    });
+    $('editor-wrap').appendChild(ta);
+    setStatus('Редактор CodeMirror не загрузился (нет доступа к CDN) — работает простое поле ввода.', 'err');
+  }
+
+  function getCode() { return cm ? cm.getValue() : ta.value; }
+  function setCode(v) { if (cm) cm.setValue(v); else ta.value = v; }
+  function focusEditor() { if (cm) cm.focus(); else ta.focus(); }
+
+  /* ---------- Статус ---------- */
+  function setStatus(text, kind) {
+    statusText.textContent = text;
+    statusBar.className = 'status' + (kind ? ' ' + kind : '');
+  }
+  function clock() {
+    var d = new Date();
+    return [d.getHours(), d.getMinutes(), d.getSeconds()]
+      .map(function (n) { return String(n).padStart(2, '0'); }).join(':');
+  }
+
+  /* ---------- Запуск ---------- */
+  // Скрипт-ловушка: сообщает о JS-ошибках из iframe в родительское окно
+  var GUARD = '<script>' +
+    'addEventListener("error",function(e){parent.postMessage({nexusErr:String(e.message)+(e.lineno?" (строка "+e.lineno+")":"")},"*")});' +
+    'addEventListener("unhandledrejection",function(e){parent.postMessage({nexusErr:"Необработанный промис: "+String(e.reason)},"*")});' +
+    '<\/script>';
+
+  function buildDoc(code) {
+    // Если у кода есть <head> / <html> — вставляем внутрь, иначе в начало
+    // (перед <!DOCTYPE> ничего не ставим, чтобы не включить quirks mode)
+    var m = code.match(/<head[^>]*>/i) || code.match(/<html[^>]*>/i);
+    if (m) {
+      var i = m.index + m[0].length;
+      return code.slice(0, i) + GUARD + code.slice(i);
+    }
+    if (/^\s*<!doctype/i.test(code)) {
+      var d = code.match(/^\s*<!doctype[^>]*>/i)[0];
+      return d + GUARD + code.slice(d.length);
+    }
+    return GUARD + code;
+  }
+
+  function run() {
+    frame.srcdoc = buildDoc(getCode());
+    previewPane.classList.add('live');
+    setStatus('Запущено в ' + clock(), 'ok');
+    // на телефоне после запуска показываем результат
+    if (window.matchMedia('(max-width: 760px)').matches) showView('view');
+  }
+
+  window.addEventListener('message', function (e) {
+    if (e.source !== frame.contentWindow) return;
+    if (e.data && e.data.nexusErr) setStatus('Ошибка в коде: ' + e.data.nexusErr, 'err');
+  });
+
+  /* ---------- Очистка ---------- */
+  function clearAll() {
+    setCode('');
+    setStatus('Поле ввода очищено', '');
+    focusEditor();
+  }
+
+  /* ---------- Авто-запуск ---------- */
+  var timer = null;
+  function onEdit() {
+    if (!autoBox.checked) return;
+    clearTimeout(timer);
+    timer = setTimeout(run, 450);
+  }
+  if (cm) cm.on('change', onEdit); else ta.addEventListener('input', onEdit);
+
+  /* ---------- Кнопки ---------- */
+  $('btn-run').addEventListener('click', run);
+  $('btn-clear').addEventListener('click', clearAll);
+
+  /* ---------- Вкладки на узком экране ---------- */
+  function showView(v) {
+    work.dataset.view = v;
+    $('tab-code').classList.toggle('on', v === 'code');
+    $('tab-view').classList.toggle('on', v === 'view');
+    if (v === 'code' && cm) cm.refresh();
+  }
+  $('tab-code').addEventListener('click', function () { showView('code'); });
+  $('tab-view').addEventListener('click', function () { showView('view'); });
+
+  /* ---------- Перетаскиваемый разделитель ---------- */
+  var split = $('split');
+  split.addEventListener('pointerdown', function (e) {
+    split.setPointerCapture(e.pointerId);
+    split.classList.add('drag');
+    frame.style.pointerEvents = 'none';
+  });
+  split.addEventListener('pointermove', function (e) {
+    if (!split.classList.contains('drag')) return;
+    var r = work.getBoundingClientRect();
+    var x = e.clientX - r.left - 18;
+    var w = r.width - 36 - 10;
+    var left = Math.max(w * 0.2, Math.min(w * 0.8, x));
+    work.style.setProperty('--left', left + 'px');
+    if (cm) cm.refresh();
+  });
+  function endDrag() {
+    split.classList.remove('drag');
+    frame.style.pointerEvents = '';
+  }
+  split.addEventListener('pointerup', endDrag);
+  split.addEventListener('pointercancel', endDrag);
+
+  /* ---------- Старт: сразу показываем пример ---------- */
+  run();
+  setStatus('Пример запущен — нажмите на кнопку в предпросмотре', 'ok');
+  if (window.matchMedia('(max-width: 760px)').matches) showView('code');
+})();
+</script>
+</body>
+</html>

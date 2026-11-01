@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Knife Hit</title>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+<style>
+/* ================= Палитра и основа ================= */
+:root{
+  --cyan:#2de2ff; --pink:#ff3d9a; --violet:#7a4dff; --bg:#080818;
+  --font:"Manrope",system-ui,sans-serif;
+  --disp:"Unbounded","Manrope",system-ui,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:#fff;font-family:var(--font);
+  user-select:none;-webkit-user-select:none;touch-action:none;overscroll-behavior:none}
+/* тёмный фон с неоновыми градиентными пятнами */
+/* цвет фона меняется вместе с мишенью (--h задаётся из JS) */
+body{--h:265;background:
+  radial-gradient(70% 45% at 50% 32%,hsl(var(--h) 55% 38% / .36),transparent 70%),
+  radial-gradient(60% 40% at 100% 100%,hsl(calc(var(--h) + 60) 50% 36% / .26),transparent 70%),
+  radial-gradient(60% 40% at 0% 100%,hsl(calc(var(--h) - 50) 50% 36% / .22),transparent 70%),hsl(var(--h) 40% 7%)}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+
+/* ================= HUD: уровень, ножи, звук ================= */
+#hud{position:fixed;inset:0;pointer-events:none;display:none}
+#hud.on{display:block}
+#top{position:absolute;left:0;right:0;top:calc(16px + env(safe-area-inset-top));text-align:center}
+#dots{display:flex;gap:9px;justify-content:center;margin-bottom:8px}
+#dots i{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.2)}
+#dots i.done{background:var(--ac,#2de2ff)}
+#dots i.cur{background:#fff;box-shadow:0 0 8px var(--ac,#2de2ff)}
+#lv{font:600 22px var(--disp)}
+#left{margin-top:4px;font:700 13px var(--font);opacity:.7}
+#pips{position:absolute;left:20px;bottom:calc(20px + env(safe-area-inset-bottom));display:flex;flex-direction:column-reverse;gap:5px}
+#pips i{display:block;width:11px;height:30px;background:linear-gradient(#e4ecf7 0 56%,#f2c25a 56% 63%,#ff7a59 63%);clip-path:polygon(50% 0,100% 18%,100% 100%,0 100%,0 18%);transition:opacity .2s,filter .2s}
+#pips i.used{filter:brightness(0);opacity:.3}
+#snd,#home{position:fixed;top:calc(16px + env(safe-area-inset-top));z-index:20;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;cursor:pointer;pointer-events:auto;padding:0}
+#snd{right:16px}
+#home{left:16px}
+svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+#toast{position:fixed;left:0;right:0;top:58%;text-align:center;font:600 26px var(--disp);pointer-events:none;opacity:0;
+  color:#fff;text-shadow:0 0 22px var(--cyan),0 0 40px var(--violet)}
+#toast.show{animation:toast 1.1s ease}
+@keyframes toast{0%{opacity:0;transform:scale(.8)}20%{opacity:1;transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:translateY(-14px)}}
+
+/* ================= Экраны: старт и проигрыш ================= */
+.ov{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;text-align:center}
+.ov[hidden]{display:none}
+#over{background:rgba(5,5,20,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.logo{margin:0;font:600 clamp(46px,15vw,84px)/.95 var(--disp);letter-spacing:1px}
+.logo span{display:block;background:linear-gradient(90deg,var(--cyan),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 18px rgba(45,226,255,.55))}
+.logo span+span{background:linear-gradient(90deg,var(--violet),var(--pink));-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 0 18px rgba(255,61,154,.6))}
+.ov p{margin:0;max-width:300px;font:700 16px/1.4 var(--font);color:rgba(255,255,255,.78)}
+.btn{margin-top:8px;padding:16px 46px;border:0;border-radius:99px;font:800 20px var(--font);color:#06061a;cursor:pointer;
+  background:linear-gradient(135deg,var(--cyan),var(--violet));box-shadow:0 0 30px rgba(45,226,255,.5),inset 0 1px 0 rgba(255,255,255,.5);transition:transform .12s}
+.btn:active{transform:scale(.94)}
+.card{padding:34px 28px;border-radius:28px;background:linear-gradient(160deg,rgba(122,77,255,.28),rgba(255,61,154,.16));
+  border:1px solid rgba(255,255,255,.22);box-shadow:0 0 60px rgba(122,77,255,.4);display:flex;flex-direction:column;align-items:center;gap:12px;animation:rise .4s cubic-bezier(.3,1.5,.5,1)}
+.card h2{margin:0;font:600 30px var(--disp);color:var(--pink);text-shadow:0 0 22px rgba(255,61,154,.7)}
+.btn.ghost{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.25);box-shadow:none}
+.btn.alt{background:linear-gradient(135deg,var(--pink),var(--violet));color:#fff;box-shadow:0 0 30px rgba(255,61,154,.45),inset 0 1px 0 rgba(255,255,255,.4)}
+.mbtn{display:flex;align-items:center;gap:14px;width:100%;max-width:310px;margin:0;padding:14px 22px;text-align:left;font-size:19px;border-radius:22px}
+.mbtn svg.i{width:30px;height:30px}
+.mbtn small{display:block;margin-top:2px;font:700 12px var(--font);opacity:.7}
+#recText{font:700 14px var(--font);color:rgba(255,255,255,.7);min-height:18px}
+.row{display:flex;gap:10px}
+.row .btn{padding:16px 30px;margin-top:6px}
+.card.win h2{color:var(--cyan);text-shadow:0 0 22px rgba(45,226,255,.7)}
+#levels{justify-content:flex-start;gap:16px;overflow-y:auto;touch-action:pan-y;background:rgba(5,5,20,.65);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding-top:calc(24px + env(safe-area-inset-top))}
+.lvhead{display:flex;align-items:center;gap:12px;width:100%;max-width:420px}
+.lvhead h2{margin:0;font:600 24px var(--disp)}
+.lvhead button{width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+#lvgrid{display:flex;flex-direction:column;gap:18px;width:100%;max-width:420px}
+.lvrow h3{display:flex;align-items:center;gap:10px;margin:0 0 8px;font:700 14px var(--font);opacity:.85}
+.lvrow canvas{width:30px;height:30px}
+.g5{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+#start{justify-content:space-between;padding:calc(7vh + env(safe-area-inset-top)) 24px calc(4vh + env(safe-area-inset-bottom))}
+.bot{display:flex;flex-direction:column;align-items:center;gap:14px;width:100%}
+.bot p{font-size:13px;opacity:.6}
+.lvbtn{aspect-ratio:1;border-radius:16px;border:1px solid rgba(45,226,255,.5);background:rgba(255,255,255,.07);color:#fff;font:800 20px var(--font);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 0 14px rgba(45,226,255,.18)}
+.lvbtn:active{transform:scale(.93)}
+.lvbtn.cur{background:linear-gradient(135deg,var(--cyan),var(--violet));color:#06061a;border-color:transparent}
+.lvbtn.lock{opacity:.35;border-color:rgba(255,255,255,.15);box-shadow:none;pointer-events:none}
+.card .big{font:800 20px var(--font);color:#fff}
+@keyframes rise{from{transform:scale(.7);opacity:0}}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="top"><div id="dots"></div><div id="lv">Level 1</div><div id="left">Ножи 5</div></div>
+  <div id="pips"></div>
+  <button id="home" aria-label="Меню"><svg class="i" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9a1 1 0 01-1 1h-4v-6h-6v6H5a1 1 0 01-1-1z"/></svg></button>
+</div>
+<button id="snd" aria-label="Звук"></button>
+<div id="toast"></div>
+
+<!-- Главное меню: название сверху, мишень в центре (рисуется на canvas), кнопки внизу -->
+<div class="ov" id="start">
+  <h1 class="logo"><span>KNIFE</span><span>HIT</span></h1>
+  <div class="bot">
+    <button class="btn mbtn" id="bLevels">
+      <svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></svg>
+      <span>Уровни<small>30 уровней, каждые 5 — новая мишень</small></span>
+    </button>
+    <button class="btn mbtn alt" id="bEndless">
+      <svg class="i" viewBox="0 0 24 24"><path d="M6 8a4 4 0 100 8c4 0 8-8 12-8a4 4 0 110 8c-4 0-8-8-12-8z"/></svg>
+      <span>Пока не проиграешь<small>Чем дальше, тем быстрее и сложнее</small></span>
+    </button>
+    <div id="recText"></div>
+    <p>Тапай, чтобы метнуть нож. Не попади в другой нож.</p>
+  </div>
+</div>
+
+<!-- Выбор уровня -->
+<div class="ov" id="levels" hidden>
+  <div class="lvhead">
+    <button id="lvBack" aria-label="Назад"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <h2>Уровни</h2>
+  </div>
+  <div id="lvgrid"></div>
+</div>
+
+<!-- Экран проигрыша / победы уровня -->
+<div class="ov" id="over" hidden>
+  <div class="card" id="ovCard">
+    <h2 id="ovTitle"></h2>
+    <div class="big" id="ovLevel"></div>
+    <p id="ovScore"></p>
+    <div class="row"><button class="btn" id="bMain"></button><button class="btn ghost" id="bMenu">Меню</button></div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* =====================================================================
+   1. УТИЛИТЫ И ЭЛЕМЕНТЫ
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+const TAU = Math.PI * 2;
+const rnd = (a, b) => a + Math.random() * (b - a);
+/* кратчайшая разница двух углов в диапазоне (-π, π] — через atan2 */
+const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* =====================================================================
+   2. ЗВУК (Web Audio API, без внешних файлов)
+   ===================================================================== */
+let AC = null, noiseBuf = null, muted = false;
+
+/* Контекст создаём при первом касании — так требуют браузеры */
+function audio(){
+  if(!AC){
+    const C = window.AudioContext || window.webkitAudioContext;
+    if(!C) return null;
+    AC = new C();
+    noiseBuf = AC.createBuffer(1, AC.sampleRate * .5, AC.sampleRate);   // 0.5 с белого шума
+    const d = noiseBuf.getChannelData(0);
+    for(let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  if(AC.state === 'suspended') AC.resume();
+  return AC;
+}
+/* Огибающая громкости: быстрая атака и экспоненциальный спад */
+function env(g, t, peak, dur){
+  g.gain.setValueAtTime(.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t + .01);
+  g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+}
+/* Тон с плавным изменением частоты f0 → f1 */
+function tone(type, f0, f1, t, dur, peak){
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(f0, t);
+  o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  env(g, t, peak, dur);
+  o.connect(g).connect(AC.destination);
+  o.start(t); o.stop(t + dur + .02);
+}
+/* Шум через фильтр (type, частота f0 → f1) */
+function noise(type, f0, f1, t, dur, peak, q = 1){
+  const s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
+  s.buffer = noiseBuf; f.type = type; f.Q.value = q;
+  f.frequency.setValueAtTime(f0, t);
+  f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  env(g, t, peak, dur);
+  s.connect(f).connect(g).connect(AC.destination);
+  s.start(t); s.stop(t + dur + .02);
+}
+const sfx = {
+  /* «свуш»: шум, у которого частота фильтра быстро растёт */
+  throw(){ if(!audio() || muted) return; noise('bandpass', 500, 3600, AC.currentTime, .17, .4, 1.4); },
+  /* глухой «тук»: низкий тон, падающий вниз + короткий шум */
+  hit(){ if(!audio() || muted) return; const t = AC.currentTime;
+    tone('triangle', 200, 50, t, .14, .6); noise('lowpass', 700, 200, t, .07, .35); },
+  /* резкая ошибка: два грубых тона вниз */
+  lose(){ if(!audio() || muted) return; const t = AC.currentTime;
+    tone('sawtooth', 320, 70, t, .45, .3); tone('square', 130, 55, t, .5, .22); },
+  /* победа уровня: три ноты вверх */
+  win(){ if(!audio() || muted) return; const t = AC.currentTime;
+    [523, 659, 784].forEach((f, i) => tone('sine', f, f, t + i * .09, .25, .3)); }
+};
+
+/* =====================================================================
+   3. СОСТОЯНИЕ ИГРЫ
+   ===================================================================== */
+let W, H, cx, cy, R, startY;                 // геометрия (пересчитывается при resize)
+let state = 'menu';                          // menu | play | clear | over
+let level = 1, score = 0, left = 0, total = 0;
+let rot = 0, speed = .9, dir = 1, t = 0;     // вращение мишени
+let theme = 0, stars = [], clouds = [];
+let kick = 0, shake = 0, flash = 0, cool = 0, readyT = 0;
+let stuck = [], flying = [], falling = [], parts = [];
+let best = 0;
+let mode = 'endless', unlocked = 1, run = 0;       // режим игры, открытые уровни, номер «сессии»
+let dirCur = 1, dirTgt = 1, revT = 3;             // плавная смена направления вращения
+const LEVELS = 30;
+try{ best = +localStorage.getItem('knifehit-bestlvl') || 0; unlocked = +localStorage.getItem('knifehit-unlocked') || 1; }catch(e){}
+const save = (k, v) => { try{ localStorage.setItem(k, v); }catch(e){} };
+
+/* Размеры подстраиваются под экран: мишень сверху, ножи метаем снизу */
+function resize(){
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  layout(); seedBg();
+}
+/* Раскладка: в меню мишень меньше и сидит между названием и кнопками */
+function layout(){
+  const m = state === 'menu';
+  R = Math.min(W * (m ? .2 : .25), H * (m ? .12 : .16));
+  cx = W / 2; cy = H * (m ? .44 : .34); startY = H * .80;
+}
+/* Звёзды и облака на фоне */
+function seedBg(){
+  stars = Array.from({length: 70}, () => ({x: Math.random() * W, y: Math.random() * H, r: rnd(.6, 1.6), p: rnd(0, TAU)}));
+  clouds = Array.from({length: 4}, (_, i) => ({x: Math.random() * W, y: H * (.14 + i * .17) + rnd(-20, 20), w: rnd(90, 150), v: rnd(6, 14)}));
+}
+addEventListener('resize', resize); resize();
+
+/* =====================================================================
+   3б. МИШЕНИ: каждые 5 уровней — новый «кружок»
+   ===================================================================== */
+const disc = (c, r, f) => { c.fillStyle = f; c.beginPath(); c.arc(0, 0, r, 0, TAU); c.fill(); };
+const rg = (c, r, st) => { const g = c.createRadialGradient(0, 0, 0, 0, 0, r); st.forEach((v, i) => g.addColorStop(i / (st.length - 1), v)); return g; };
+const ring = (c, r, col, w) => { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.arc(0, 0, r, 0, TAU); c.stroke(); };
+/* Каждая мишень рисуется в центре (0,0) радиусом r; метки нужны, чтобы было видно вращение */
+const THEMES = [
+  {name: 'Бревно', halo: '#f0b36a', h: 265, draw(c, r){
+    disc(c, r, rg(c, r, ['#f0bd7e', '#c98a4d', '#7d4722']));
+    for(let i = 1; i < 6; i++) ring(c, r * i / 6, 'rgba(70,32,8,.3)', r * .02);
+    c.strokeStyle = 'rgba(60,28,8,.5)'; c.lineWidth = r * .025;
+    [.6, 2.3, 4.1].forEach(a => { c.beginPath(); c.moveTo(Math.cos(a) * r * .14, Math.sin(a) * r * .14); c.lineTo(Math.cos(a + .08) * r * .88, Math.sin(a + .08) * r * .88); c.stroke(); });
+    c.fillStyle = 'rgba(70,32,8,.5)';
+    [[1.4, .55, .09], [3.4, .7, .07], [5.2, .4, .06]].forEach(([a, d, k]) => { c.beginPath(); c.ellipse(Math.cos(a) * r * d, Math.sin(a) * r * d, r * k * 1.3, r * k, a, 0, TAU); c.fill(); });
+  }},
+  {name: 'Апельсин', halo: '#ffb347', h: 25, draw(c, r){
+    disc(c, r, '#f08a1c'); disc(c, r * .92, '#ffe27a'); disc(c, r * .86, rg(c, r * .86, ['#ffd02e', '#ffa51f', '#f58a1c']));
+    c.strokeStyle = 'rgba(255,246,200,.7)'; c.lineWidth = r * .035;
+    for(let i = 0; i < 10; i++){ const a = i * TAU / 10, e = i % 2 ? .78 : .86; c.beginPath(); c.moveTo(Math.cos(a) * r * .1, Math.sin(a) * r * .1); c.lineTo(Math.cos(a) * r * e, Math.sin(a) * r * e); c.stroke(); }
+    c.fillStyle = 'rgba(255,240,170,.7)';
+    [[.3, .5], [1.5, .62], [2.9, .45], [4.2, .6], [5.4, .52]].forEach(([a, d]) => { c.beginPath(); c.ellipse(Math.cos(a) * r * d, Math.sin(a) * r * d, r * .05, r * .025, a, 0, TAU); c.fill(); });
+    disc(c, r * .05, '#fff3b0');
+  }},
+  {name: 'Пластинка', halo: '#8d9bff', h: 235, draw(c, r){
+    disc(c, r, '#15152c');
+    for(let i = 1; i < 14; i++) ring(c, r * (.38 + i * .045), 'rgba(255,255,255,.06)', r * .012);
+    c.fillStyle = 'rgba(255,255,255,.1)';
+    [0, Math.PI].forEach(a => { c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, r * .96, a + .2, a + .7); c.closePath(); c.fill(); });
+    disc(c, r * .3, rg(c, r * .3, ['#ff9ec0', '#8d5cff'])); disc(c, r * .04, '#15152c');
+    c.fillStyle = '#fff'; c.beginPath(); c.moveTo(r * .2, 0); c.lineTo(r * .27, -r * .04); c.lineTo(r * .27, r * .04); c.fill();
+  }},
+  {name: 'Пончик', halo: '#ff8fb8', h: 330, draw(c, r){
+    const path = (q, wavy) => { c.beginPath(); for(let i = 0; i <= 120; i++){ const a = i * TAU / 120, k = wavy ? 1 + .04 * Math.sin(a * 9) : 1; c[i ? 'lineTo' : 'moveTo'](Math.cos(a) * q * k, Math.sin(a) * q * k); } c.closePath(); };
+    const hole = () => { c.moveTo(r * .27, 0); c.arc(0, 0, r * .27, 0, TAU); };
+    c.fillStyle = '#d9a066'; path(r, 0); hole(); c.fill('evenodd');
+    c.fillStyle = '#ff8fb8'; path(r * .9, 1); hole(); c.fill('evenodd');
+    [[.5, .6, '#fff'], [1.3, .5, '#7ae0ff'], [2.1, .72, '#ffe36e'], [2.9, .55, '#fff'], [3.7, .66, '#7ae0ff'], [4.4, .5, '#ffe36e'], [5.2, .7, '#fff'], [5.8, .58, '#7ae0ff']].forEach(([a, d, col], i) => {
+      c.save(); c.translate(Math.cos(a) * r * d, Math.sin(a) * r * d); c.rotate(i * 1.7); c.fillStyle = col; c.fillRect(-r * .07, -r * .017, r * .14, r * .034); c.restore(); });
+  }},
+  {name: 'Планета', halo: '#8fb7ff', h: 215, draw(c, r){
+    disc(c, r, rg(c, r, ['#c9d6ff', '#6f82e0', '#34408f']));
+    c.save(); c.beginPath(); c.arc(0, 0, r, 0, TAU); c.clip();
+    c.fillStyle = 'rgba(30,40,110,.28)'; [-.5, -.1, .35, .7].forEach((y, i) => c.fillRect(-r, y * r, 2 * r, r * (.08 + .04 * i)));
+    [[.8, .45, .16], [3.1, .6, .1], [4.6, .35, .12], [5.6, .7, .09]].forEach(([a, d, k]) => {
+      const x = Math.cos(a) * r * d, y = Math.sin(a) * r * d;
+      c.fillStyle = 'rgba(25,32,90,.4)'; c.beginPath(); c.arc(x, y, r * k, 0, TAU); c.fill();
+      c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = r * .015; c.beginPath(); c.arc(x, y, r * k, Math.PI * 1.1, Math.PI * 1.9); c.stroke(); });
+    c.restore();
+  }},
+  {name: 'Неон', halo: '#33f0c8', h: 170, draw(c, r){
+    disc(c, r, '#0d1430'); c.lineCap = 'round';
+    [[.82, '#33f0c8', 3], [.6, '#ff5fa8', 4], [.38, '#7a8cff', 3]].forEach(([k, col, n], i) => {
+      c.strokeStyle = col; c.lineWidth = r * .07;
+      for(let j = 0; j < n; j++){ const a = j * TAU / n + i; c.beginPath(); c.arc(0, 0, r * k, a, a + TAU / n * .62); c.stroke(); } });
+    c.lineCap = 'butt'; disc(c, r * .14, rg(c, r * .14, ['#fff', '#33f0c8']));
+  }}
+];
+/* Мишень зависит от уровня: каждые 5 уровней новая */
+function applyTheme(){
+  const th = THEMES[theme];
+  document.documentElement.style.setProperty('--ac', th.halo);
+  document.body.style.setProperty('--h', th.h);
+}
+function toastMsg(txt){
+  const el = $('toast'); el.textContent = txt;
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+}
+
+/* =====================================================================
+   4. УРОВНИ
+   ===================================================================== */
+function startLevel(){
+  /* Чем выше уровень, тем больше ножей, быстрее вращение и больше «чужих» ножей */
+  total = left = Math.min(11, 5 + (level >> 1));
+  speed = Math.min(1.3 + .24 * (level - 1), 6.2);
+  dir = dirTgt = dirCur = level % 2 ? 1 : -1; revT = rnd(2, 4);
+  stuck = []; flying = []; cool = 0; readyT = 0;
+  const obstacles = Math.min(4, (level - 1) / 3 | 0);
+  for(let i = 0; i < obstacles; i++){
+    for(let tries = 0; tries < 60; tries++){
+      const a = rnd(-Math.PI, Math.PI);
+      if(stuck.every(k => Math.abs(angDiff(a, k.a)) > .6)){ stuck.push({a, pen: 1, obs: true, wob: 0}); break; }
+    }
+  }
+  state = 'play';
+  theme = ((level - 1) / 5 | 0) % THEMES.length; applyTheme(); layout();
+  if(level > 1 && (level - 1) % 5 === 0) toastMsg('Новая мишень: ' + THEMES[theme].name);
+  buildPips(); updateHud();
+}
+function buildPips(){
+  $('pips').innerHTML = '<i></i>'.repeat(total);
+}
+function updateHud(){
+  $('lv').textContent = 'Level ' + level;
+  $('left').textContent = 'Ножи ' + left;
+  const q = (level - 1) % 5;                               // 5 точек: прогресс до новой мишени
+  $('dots').innerHTML = [0, 1, 2, 3, 4].map(i => '<i class="' + (i < q ? 'done' : i === q ? 'cur' : '') + '"></i>').join('');
+  [...$('pips').children].forEach((p, i) => p.classList.toggle('used', i < total - left));
+}
+/* Запуск игры: mode = 'levels' (выбранный уровень) или 'endless' (пока не проиграешь) */
+function startMode(m, lv){
+  run++; mode = m; level = lv; score = 0; falling = []; parts = [];
+  $('start').hidden = $('levels').hidden = $('over').hidden = true;
+  $('hud').classList.add('on');
+  startLevel();
+}
+/* Главное меню */
+function goMenu(){
+  run++; falling = []; parts = []; flying = [];
+  $('hud').classList.remove('on'); $('over').hidden = $('levels').hidden = true; $('start').hidden = false;
+  $('recText').textContent = best ? 'Рекорд в бесконечном режиме: Level ' + best : '';
+  menuScene(); theme = Math.random() * THEMES.length | 0; applyTheme(); layout();
+}
+/* Выбор уровня: открытые доступны, закрытые показаны замком */
+const LOCK = '<svg class="i" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>';
+function buildLevels(){
+  const g = $('lvgrid'); g.innerHTML = '';
+  for(let r = 0; r < LEVELS / 5; r++){                    // ряд = 5 уровней = одна мишень
+    const th = r % THEMES.length, row = document.createElement('div'); row.className = 'lvrow';
+    const pv = document.createElement('canvas'); pv.width = pv.height = 60;
+    const x = pv.getContext('2d'); x.translate(30, 30); THEMES[th].draw(x, 27);
+    const h = document.createElement('h3'); h.append(pv, THEMES[th].name + ', уровни ' + (r * 5 + 1) + '–' + (r * 5 + 5));
+    const g5 = document.createElement('div'); g5.className = 'g5';
+    for(let i = r * 5 + 1; i <= r * 5 + 5; i++){
+      const b = document.createElement('button');
+      b.className = 'lvbtn' + (i > unlocked ? ' lock' : '') + (i === unlocked ? ' cur' : '');
+      b.innerHTML = i > unlocked ? LOCK : '<span>' + i + '</span>';
+      if(i <= unlocked) b.onclick = () => startMode('levels', i);
+      g5.append(b);
+    }
+    row.append(h, g5); g.append(row);
+  }
+  $('start').hidden = true; $('levels').hidden = false;
+}
+/* Окно после уровня: win = true — уровень пройден, false — проигрыш */
+let overAction = () => {};
+function showOver(win){
+  $('ovCard').classList.toggle('win', win);
+  $('ovTitle').textContent = win ? 'Уровень пройден' : 'Нож в нож';
+  $('ovLevel').textContent = 'Level ' + level;
+  let txt, main, act;
+  if(win){
+    const more = level < LEVELS;
+    txt = more ? 'Дальше вращение быстрее, а мишень сложнее' : 'Все уровни пройдены!';
+    main = more ? 'Дальше' : ''; act = () => startMode('levels', level + 1);
+  } else if(mode === 'levels'){
+    txt = 'Попробуй ещё раз'; main = 'Заново'; act = () => startMode('levels', level);
+  } else {
+    txt = 'Воткнуто ножей: ' + score + ' · Рекорд: Level ' + best; main = 'Заново'; act = () => startMode('endless', 1);
+  }
+  $('ovScore').textContent = txt; $('bMain').textContent = main; $('bMain').hidden = !main;
+  overAction = act; $('over').hidden = false;
+}
+
+/* Фон меню: мишень медленно крутится с несколькими ножами */
+function menuScene(){
+  state = 'menu'; speed = .9; dir = dirTgt = dirCur = 1; stuck = [];
+  for(let i = 0; i < 7; i++) stuck.push({a: i * TAU / 7 + rnd(-.15, .15), pen: 1, obs: i % 3 === 0, wob: 0});
+}
+
+/* =====================================================================
+   5. БРОСОК И СТОЛКНОВЕНИЯ
+   ===================================================================== */
+function throwKnife(){
+  if(state !== 'play' || left <= 0 || cool > 0) return;
+  left--; cool = .09; readyT = 0;
+  flying.push({tip: startY});                  // tip — y-координата кончика ножа
+  sfx.throw(); updateHud();
+}
+
+/* Нож долетел до края мишени — определяем: воткнулся или столкнулся */
+function land(f){
+  /* угол точки удара относительно мишени: atan2 даёт направление от центра к кончику
+     ножа (снизу это π/2), вычитаем текущий поворот — получаем угол «на самом бревне» */
+  const hitAngle = Math.atan2(f.tip - cy, 0) - rot;
+  const minGap = .17;                          // минимальный угловой зазор между ножами (рад)
+  const crash = stuck.some(k => Math.abs(angDiff(hitAngle, k.a)) < minGap);
+  if(crash) return lose(f);
+
+  stuck.push({a: hitAngle, pen: 0, wob: .14});           // pen: 0 → 1 анимация «вбивания»
+  score++; kick = 9; sfx.hit();
+  for(let i = 0; i < 9; i++)                   // щепки
+    parts.push({x: cx, y: cy + R, vx: rnd(-160, 160), vy: rnd(-260, -40), life: .5, max: .5, s: rnd(2, 5), c: '#d9a066', sq: true});
+}
+
+function lose(f){
+  state = 'over'; flash = 1; shake = reduceMotion ? 0 : 10;
+  falling.push({x: cx, y: f.tip, ang: Math.PI / 2, vx: rnd(-260, 260), vy: 420, spin: rnd(-9, 9), c: '#ff7a59'});
+  for(let i = 0; i < 18; i++)
+    parts.push({x: cx, y: f.tip, vx: rnd(-320, 320), vy: rnd(-320, 120), life: .6, max: .6, s: rnd(2, 4), c: '#ff3d9a'});
+  sfx.lose();
+  if(mode === 'endless' && level > best){ best = level; save('knifehit-bestlvl', best); }
+  const r = run;
+  setTimeout(() => { if(r === run) showOver(false); }, 750);
+}
+
+/* Все ножи воткнуты: ножи разлетаются, звучит победа, через секунду — следующий уровень */
+function clearLevel(){
+  state = 'clear'; sfx.win();
+  stuck.forEach(k => {
+    const a = k.a + rot, d = R * (1 - .28 * k.pen);
+    falling.push({x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d, ang: a,
+      vx: Math.cos(a) * rnd(250, 520), vy: Math.sin(a) * rnd(250, 520) - 220, spin: rnd(-8, 8), c: k.obs ? '#9a6bff' : '#ff7a59'});
+  });
+  stuck = [];
+  for(let i = 0; i < 30; i++)
+    parts.push({x: cx, y: cy, vx: rnd(-420, 420), vy: rnd(-420, 420), life: .9, max: .9, s: rnd(2, 5), c: ['#2de2ff', '#ff3d9a', '#7a4dff'][i % 3]});
+  const r = run;
+  if(mode === 'levels'){                                  // режим уровней: открываем следующий и показываем окно
+    if(level >= unlocked && level < LEVELS){ unlocked = level + 1; save('knifehit-unlocked', unlocked); }
+    setTimeout(() => { if(r === run) showOver(true); }, 900);
+  } else {                                                // бесконечный режим: сразу следующий уровень
+    toastMsg('Level ' + level + ' пройден!');
+    setTimeout(() => { if(r === run){ level++; startLevel(); } }, 1100);
+  }
+}
+
+/* =====================================================================
+   6. ОБНОВЛЕНИЕ КАДРА
+   ===================================================================== */
+function update(dt){
+  t += dt; cool = Math.max(0, cool - dt); readyT += dt;
+
+  /* вращение мишени; с 4-го уровня скорость «дышит», усложняя расчёт броска */
+  /* с 4-го уровня скорость «дышит», с 8-го мишень ещё и разворачивается — чем выше уровень, тем сильнее */
+  revT -= dt;
+  if(state === 'play' && level >= 8 && revT <= 0){ dirTgt = -dirTgt; revT = Math.max(1.2, rnd(2.2, 4.2) - level * .04); }
+  dirCur += (dirTgt - dirCur) * Math.min(1, dt * 4);
+  let sp = speed * dirCur;
+  if(state === 'play' && level >= 4) sp *= 1 + Math.min(.7, .2 + level * .025) * Math.sin(t * 1.7);
+  rot += sp * dt;
+
+  kick *= Math.exp(-dt * 14); shake *= Math.exp(-dt * 6); flash *= Math.exp(-dt * 5);
+  stuck.forEach(k => { k.pen = Math.min(1, k.pen + dt * 14); k.wob *= Math.exp(-dt * 7); });
+  clouds.forEach(c => { c.x += c.v * dt; if(c.x > W + c.w) c.x = -c.w; });
+
+  /* летящие ножи */
+  const fly = H * 2.6;
+  for(let i = flying.length - 1; i >= 0; i--){
+    const f = flying[i];
+    f.tip -= fly * dt;
+    if(f.tip <= cy + R){ flying.splice(i, 1); if(state === 'play') land(f); }
+  }
+  /* падающие ножи и частицы */
+  falling.forEach(o => { o.vy += 1600 * dt; o.x += o.vx * dt; o.y += o.vy * dt; o.ang += o.spin * dt; });
+  falling = falling.filter(o => o.y < H + 250);
+  parts.forEach(p => { p.vy += 900 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; });
+  parts = parts.filter(p => p.life > 0);
+
+  if(state === 'play' && left === 0 && flying.length === 0) clearLevel();
+}
+
+/* =====================================================================
+   7. ОТРИСОВКА
+   ===================================================================== */
+/* Нож: кончик в точке (x, y), корпус направлен вдоль угла ang; hc — цвет рукояти */
+function drawKnife(x, y, ang, hc, alpha = 1){
+  const B = R * .62, Hd = R * .5, w = R * .17;      // клинок, рукоять, ширина
+  ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.globalAlpha = alpha;
+  const g = ctx.createLinearGradient(0, -w / 2, 0, w / 2);
+  g.addColorStop(0, '#f6fbff'); g.addColorStop(.55, '#c4d0e2'); g.addColorStop(1, '#8d9bb5');
+  ctx.fillStyle = g;                                 // клинок
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(B * .35, -w / 2); ctx.lineTo(B, -w / 2);
+  ctx.lineTo(B, w / 2); ctx.lineTo(B * .35, w / 2); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(60,80,120,.3)'; ctx.fillRect(B * .3, -w * .04, B * .7, w * .08);   // долы
+  ctx.fillStyle = '#f2c25a'; ctx.fillRect(B, -w * .8, R * .07, w * 1.6);                   // гарда
+  ctx.fillStyle = hc; ctx.fillRect(B + R * .07, -w * .36, Hd, w * .72);                    // рукоять
+  ctx.fillStyle = 'rgba(0,0,0,.22)';
+  for(let i = 1; i < 5; i++) ctx.fillRect(B + R * .07 + Hd * i / 5, -w * .36, R * .025, w * .72);
+  ctx.fillStyle = '#f2c25a'; ctx.beginPath(); ctx.arc(B + R * .07 + Hd, 0, w * .4, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+/* Фон: мерцающие звёзды, мягкая луна и плывущие облака */
+function drawBg(){
+  stars.forEach(s => { ctx.globalAlpha = .35 + .3 * Math.sin(t * 1.1 + s.p); ctx.fillStyle = '#dfe6ff'; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, TAU); ctx.fill(); });
+  const mx = W * .84, my = H * .13, mr = Math.min(W, H) * .07;
+  const g = ctx.createRadialGradient(mx, my, mr * .6, mx, my, mr * 3);
+  g.addColorStop(0, 'rgba(200,210,255,.26)'); g.addColorStop(1, 'rgba(200,210,255,0)');
+  ctx.globalAlpha = 1; ctx.fillStyle = g; ctx.fillRect(mx - mr * 3, my - mr * 3, mr * 6, mr * 6);
+  ctx.fillStyle = '#e6eaff'; ctx.beginPath(); ctx.arc(mx, my, mr, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(150,160,210,.35)';
+  [[-.3, -.2, .22], [.35, .15, .16], [-.1, .45, .12]].forEach(([a, b, k]) => { ctx.beginPath(); ctx.arc(mx + a * mr, my + b * mr, k * mr, 0, TAU); ctx.fill(); });
+  ctx.fillStyle = 'rgba(150,165,255,.08)';
+  clouds.forEach(c => { ctx.beginPath(); ctx.ellipse(c.x, c.y, c.w / 2, c.w * .12, 0, 0, TAU); ctx.ellipse(c.x - c.w * .15, c.y - c.w * .1, c.w * .22, c.w * .16, 0, 0, TAU); ctx.ellipse(c.x + c.w * .12, c.y - c.w * .13, c.w * .26, c.w * .2, 0, 0, TAU); ctx.fill(); });
+}
+
+/* Мишень: свечение, вращающийся рисунок темы и тонкий контур */
+function drawTarget(){
+  const th = THEMES[theme];
+  ctx.save(); ctx.translate(cx, cy - kick);
+  ctx.shadowColor = th.halo; ctx.shadowBlur = 26; ctx.globalAlpha = .7; ctx.lineWidth = 2; ctx.strokeStyle = th.halo;
+  ctx.beginPath(); ctx.arc(0, 0, R + 3, 0, TAU); ctx.stroke();
+  ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  ctx.rotate(rot); th.draw(ctx, R);
+  ring(ctx, R, 'rgba(0,0,0,.28)', 2);
+  ctx.restore();
+}
+
+function render(){
+  ctx.clearRect(0, 0, W, H);
+  drawBg(); ctx.globalAlpha = 1;
+  ctx.save();
+  if(shake > .3) ctx.translate(rnd(-shake, shake), rnd(-shake, shake));
+
+  /* воткнутые ножи: положение = центр + направление (угол + поворот мишени), после удара слегка дрожат */
+  stuck.forEach(k => {
+    const a = k.a + rot, d = R * (1 - .28 * k.pen);
+    drawKnife(cx + Math.cos(a) * d, cy - kick + Math.sin(a) * d, a + Math.sin(t * 45) * k.wob, k.obs ? '#9a6bff' : '#ff7a59');
+  });
+  drawTarget();                                                 // мишень перекрывает вошедшую часть клинков
+  stuck.forEach(k => {                                          // тёмный надрез в месте входа клинка
+    const a = k.a + rot;
+    ctx.save(); ctx.translate(cx + Math.cos(a) * R, cy - kick + Math.sin(a) * R); ctx.rotate(a);
+    ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.fillRect(-3, -R * .085, 5, R * .17); ctx.restore();
+  });
+
+  flying.forEach(f => {
+    [2, 1].forEach(i => drawKnife(cx, f.tip + i * R * .22, Math.PI / 2, '#ff7a59', .06 * (3 - i)));   // лёгкий шлейф
+    drawKnife(cx, f.tip, Math.PI / 2, '#ff7a59');
+  });
+  if(state === 'play' && left > 0)                              // следующий нож ждёт внизу
+    drawKnife(cx, startY, Math.PI / 2, '#ff7a59', Math.min(1, readyT / .1));
+  falling.forEach(o => drawKnife(o.x, o.y, o.ang, o.c));
+
+  parts.forEach(p => {
+    ctx.globalAlpha = Math.max(0, p.life / p.max); ctx.fillStyle = p.c;
+    if(p.sq) ctx.fillRect(p.x, p.y, p.s, p.s);
+    else { ctx.beginPath(); ctx.arc(p.x, p.y, p.s, 0, TAU); ctx.fill(); }
+  });
+  ctx.restore();
+  if(flash > .02){ ctx.fillStyle = 'rgba(255,61,154,' + flash * .16 + ')'; ctx.fillRect(0, 0, W, H); }
+}
+
+/* Главный цикл на requestAnimationFrame */
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(.033, (now - last) / 1000); last = now;
+  update(dt); render();
+  requestAnimationFrame(frame);
+}
+
+/* =====================================================================
+   8. УПРАВЛЕНИЕ
+   ===================================================================== */
+addEventListener('pointerdown', e => {
+  audio();                                                      // разблокируем звук первым касанием
+  if(e.target.closest('button')) return;
+  throwKnife();
+});
+addEventListener('keydown', e => { if(e.code === 'Space'){ e.preventDefault(); throwKnife(); } });
+$('bLevels').onclick = buildLevels;
+$('bEndless').onclick = () => startMode('endless', 1);
+$('lvBack').onclick = goMenu;
+$('home').onclick = goMenu;
+$('bMain').onclick = () => overAction();
+$('bMenu').onclick = goMenu;
+/* значок звука рисуется SVG */
+const setSndIcon = () => $('snd').innerHTML = '<svg class="i" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/>' +
+  (muted ? '<path d="M16 9l5 6M21 9l-5 6"/>' : '<path d="M16 9a4 4 0 010 6"/>') + '</svg>';
+$('snd').onclick = () => { muted = !muted; setSndIcon(); };
+setSndIcon();
+
+goMenu();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

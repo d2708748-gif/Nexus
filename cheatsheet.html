@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07071a">
+<title>Шпаргалка</title>
+<style>
+:root{--bg:#07071a;--panel:#0d0d28;--line:rgba(140,120,255,.2);--text:#e9e9ff;--muted:#8a8ab5;
+  --violet:#a855ff;--blue:#27c8ff;--green:#2dffa8;--danger:#ff4d7d;--glow:0 0 18px rgba(168,85,255,.55)}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--text);background:var(--bg);
+  background-image:radial-gradient(800px 460px at 90% -10%,rgba(168,85,255,.18),transparent 60%),
+                   radial-gradient(600px 460px at -10% 110%,rgba(39,200,255,.13),transparent 60%)}
+.app{height:100vh;height:100dvh;display:flex;flex-direction:column;gap:12px;
+  padding:max(10px,env(safe-area-inset-top)) 14px max(14px,env(safe-area-inset-bottom))}
+
+/* верхняя строка; в Nexus слева место под кнопку «Выход» */
+.top{display:flex;align-items:baseline;gap:12px;min-height:44px;padding-top:6px}
+.in-nexus .top{padding-left:104px}
+h1{font-size:24px;font-weight:800;letter-spacing:.3px;background:linear-gradient(90deg,var(--violet),var(--blue));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+h1::after{content:"_";color:var(--green);-webkit-text-fill-color:var(--green);animation:blink 1.1s steps(1) infinite}
+.top p{color:var(--muted);font-size:13px}
+@keyframes blink{50%{opacity:0}}
+
+/* лист блокнота */
+.sheet{position:relative;flex:1;min-height:0;background:var(--panel);border:1px solid var(--violet);
+  border-radius:20px;overflow:hidden;box-shadow:0 0 34px rgba(168,85,255,.25)}
+.sheet::before{content:"";position:absolute;top:0;bottom:0;left:44px;width:1px;background:rgba(255,79,216,.45);
+  box-shadow:0 0 8px rgba(255,79,216,.5);pointer-events:none}
+textarea{position:absolute;inset:0;width:100%;height:100%;resize:none;border:0;outline:0;background:transparent;color:var(--text);
+  font:16px/28px ui-monospace,'SF Mono',Consolas,monospace;padding:28px 18px 28px 58px;caret-color:var(--green);
+  background-image:repeating-linear-gradient(transparent 0,transparent 27px,rgba(140,120,255,.14) 27px,rgba(140,120,255,.14) 28px);
+  background-attachment:local}
+textarea::placeholder{color:#5d5d90}
+textarea:focus{box-shadow:inset 0 0 0 2px rgba(39,200,255,.35)}
+
+/* нижняя панель */
+.bar{display:flex;align-items:center;gap:14px}
+#status{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:600;color:var(--muted);flex:1;min-width:0}
+#status::before{content:"";width:9px;height:9px;border-radius:50%;background:currentColor;box-shadow:0 0 10px currentColor;flex:none}
+#status.ok{color:var(--green)}#status.dirty{color:var(--blue)}#status.fail{color:var(--danger)}
+#count{font-size:13px;color:var(--muted);white-space:nowrap}
+button{display:inline-flex;align-items:center;gap:8px;padding:13px 24px;border:0;border-radius:14px;font:inherit;font-weight:700;
+  color:#fff;cursor:pointer;background:linear-gradient(90deg,var(--violet),var(--blue));box-shadow:var(--glow);transition:.2s}
+button:hover{transform:translateY(-2px);box-shadow:0 0 28px rgba(39,200,255,.6)}
+button:active{transform:none}
+button svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+@media(max-width:480px){.top p{display:none}#count{display:none}}
+@media(prefers-reduced-motion:reduce){h1::after{animation:none}button{transition:none}}
+</style>
+</head>
+<body>
+<main class="app">
+  <header class="top"><h1>Шпаргалка</h1><p>Хранится на этом устройстве</p></header>
+  <div class="sheet">
+    <textarea id="note" spellcheck="false" placeholder="Команды, ссылки, формулы — всё, что должно быть под рукой"></textarea>
+  </div>
+  <div class="bar">
+    <span id="status"></span><span id="count"></span>
+    <button id="save" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h11l4 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M8 3v5h7V3M8 21v-7h8v7"/></svg>
+      Сохранить
+    </button>
+  </div>
+</main>
+
+<script>
+(() => {
+  const KEY = 'nexus.shpargalka.v1';   // уникальный ключ: лаунчер и игры делят одно хранилище
+  const $ = id => document.getElementById(id);
+  const note = $('note'), status = $('status'), count = $('count');
+  if (window.self !== window.top) document.documentElement.classList.add('in-nexus');
+
+  let saved = '', storageOk = true;
+  try { saved = localStorage.getItem(KEY) || ''; } catch { storageOk = false; }
+  note.value = saved;
+
+  function show(cls, text) { status.className = cls; status.textContent = text; }
+  function refresh() {
+    count.textContent = note.value.length + ' симв.';
+    if (!storageOk) return show('fail', 'Память недоступна — текст не сохранится');
+    note.value === saved ? show('ok', 'Сохранено') : show('dirty', 'Есть несохранённые изменения');
+  }
+
+  function save() {
+    try { localStorage.setItem(KEY, note.value); saved = note.value; refresh(); }
+    catch { storageOk = false; refresh(); }
+  }
+
+  note.addEventListener('input', refresh);
+  $('save').addEventListener('click', save);
+  addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save(); }
+  });
+  refresh();
+})();
+</script>
+</body>
+</html>

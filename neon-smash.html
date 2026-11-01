@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>NEON SMASH</title>
+<style>
+:root{--p1:#00e5ff;--p2:#ff2e88;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{height:100%;margin:0;background:#000;color:#fff;overflow:hidden;font-family:"Courier New",ui-monospace,monospace;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+#game{position:relative;height:100%;display:flex;touch-action:none}
+.half{position:relative;flex:1;overflow:hidden;touch-action:none}
+#left{background:radial-gradient(ellipse at 50% 100%,#00e5ff1c,transparent 70%)}
+#right{background:radial-gradient(ellipse at 50% 100%,#ff2e881c,transparent 70%)}
+.half::before,#ov::before{content:"";position:absolute;inset:0;background-image:linear-gradient(#ffffff08 1px,transparent 1px),linear-gradient(90deg,#ffffff08 1px,transparent 1px);background-size:36px 36px;pointer-events:none}
+#ov::before{animation:grid 6s linear infinite}
+.score{position:absolute;top:14px;font-size:3.2rem;font-weight:700;font-variant-numeric:tabular-nums;pointer-events:none}
+#left .score{left:14px;color:var(--p1);text-shadow:0 0 8px var(--p1),0 0 26px var(--p1)}
+#right .score{right:14px;color:var(--p2);text-shadow:0 0 8px var(--p2),0 0 26px var(--p2)}
+#mid{position:absolute;top:0;bottom:0;left:50%;width:2px;margin-left:-1px;background:linear-gradient(var(--p1),var(--p2));box-shadow:0 0 10px var(--p1),0 0 10px var(--p2);pointer-events:none}
+#timer{position:absolute;top:12px;left:50%;transform:translateX(-50%);font-size:1.9rem;font-weight:700;font-variant-numeric:tabular-nums;text-shadow:0 0 10px #fff8;pointer-events:none;z-index:2}
+#timer.hot{color:#f22;text-shadow:0 0 14px #f22;animation:blink .5s steps(2,end) infinite}
+.t{position:absolute;width:72px;height:72px;border-radius:50%;border:3px solid;animation:life 1.2s ease-out forwards}
+.t::after{content:"";position:absolute;inset:16px;border-radius:50%;background:currentColor;box-shadow:0 0 12px currentColor}
+#left .t{color:var(--p1);box-shadow:0 0 14px var(--p1),0 0 36px #00e5ff88,inset 0 0 16px #00e5ff88}
+#right .t{color:var(--p2);box-shadow:0 0 14px var(--p2),0 0 36px #ff2e8888,inset 0 0 16px #ff2e8888}
+.pt{position:absolute;width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor;pointer-events:none;animation:burst .6s ease-out forwards}
+.rp{position:absolute;width:64px;height:64px;margin:-32px 0 0 -32px;border:3px solid currentColor;border-radius:50%;box-shadow:0 0 12px currentColor;pointer-events:none;animation:rp .4s ease-out forwards}
+@keyframes rp{from{transform:scale(.2);opacity:1}to{transform:scale(1.5);opacity:0}}
+.pop{position:absolute;font-weight:700;font-size:1.5rem;pointer-events:none;transform:translate(-50%,-50%);animation:rise .7s ease-out forwards;text-shadow:0 0 10px currentColor}
+.glitch{animation:glitch .35s steps(2,end);box-shadow:inset 0 0 90px #f03a}
+#ov{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 30%,#1a0a2eee,#000f 75%);text-align:center;overflow-y:auto}
+#ov.off{display:none}
+#ov.cd{background:#000a;pointer-events:none}#ov.cd::before{display:none}
+.card{position:relative;display:flex;flex-direction:column;align-items:center;gap:14px;padding:14px;margin:auto 14px;max-width:360px;width:100%;box-sizing:border-box}
+.card.box{border:2px solid #fff;border-radius:12px;background:#000c;box-shadow:0 0 30px currentColor}
+h1{margin:0;font-size:2.7rem;letter-spacing:.12em;line-height:1.02;text-shadow:-3px 0 var(--p1),3px 0 var(--p2),0 0 22px #fff6}
+p{margin:0;color:#fffa;font-size:.85rem;max-width:30ch;line-height:1.5}
+button{font:inherit;font-weight:700;font-size:1.2rem;color:#fff;background:none;border:2px solid #fff;border-radius:8px;padding:14px 34px;box-shadow:0 0 18px #fff,inset 0 0 18px #fff4;cursor:pointer;touch-action:manipulation}
+button.ghost{font-size:.9rem;padding:8px 18px;border-color:#fff6;box-shadow:none;color:#fffb}
+button:active{transform:scale(.95)}
+#go{background:linear-gradient(90deg,#00e5ff55,#ff2e8855);animation:glow 1.6s ease-in-out infinite alternate}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}
+.tabs button{font-size:.72rem;padding:10px 4px;box-shadow:none;border-color:#fff5;color:#fffb}
+.tabs button.on{border-color:#fff;color:#fff;background:#fff2;box-shadow:0 0 14px #fff8}
+.set{width:100%;padding:12px;border:1px solid #fff4;border-radius:10px;background:#0008;box-sizing:border-box}
+.set label{display:block;font-size:.95rem;margin-bottom:12px}.set b{font-size:1.5rem;text-shadow:0 0 10px #fff}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:8px;border-radius:4px;background:linear-gradient(90deg,var(--p1),var(--p2));box-shadow:0 0 12px #fff5;outline:none;margin:0}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;border-radius:50%;background:#000;border:3px solid #fff;box-shadow:0 0 14px #fff}
+input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:#000;border:3px solid #fff}
+.mas{width:96px;height:96px;filter:drop-shadow(0 0 12px #ff2e88aa) drop-shadow(0 0 12px #00e5ffaa);animation:float 2.4s ease-in-out infinite}
+.mw{position:relative;width:100px;height:100px;flex:none}
+.mw .mas{position:absolute;inset:0;width:100%;height:100%}
+.mw .ph{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;border:3px solid #fff;box-sizing:border-box;box-shadow:-6px 0 16px #00e5ff,6px 0 16px #ff2e88;animation:float 2.4s ease-in-out infinite;background:#000}
+.mas .eyes{transform-box:fill-box;transform-origin:center;animation:bl 4s infinite}
+.big{font-size:6rem;font-weight:700;text-shadow:0 0 30px currentColor;animation:pulse .9s ease-out}
+.res{font-size:1.9rem;font-weight:700;text-shadow:0 0 14px currentColor}
+.vs{font-size:1.6rem;line-height:1.5}.row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+#fin{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:3;background:#000a}
+#fin[hidden]{display:none}
+@keyframes life{0%{transform:scale(0);opacity:0}10%{transform:scale(1.12);opacity:1}18%{transform:scale(1)}100%{transform:scale(.7);opacity:.5}}
+@keyframes burst{to{transform:translate(var(--dx),var(--dy)) scale(0);opacity:0}}
+@keyframes rise{to{transform:translate(-50%,-150%);opacity:0}}
+@keyframes glitch{0%{transform:translate(0)}20%{transform:translate(-8px,3px);filter:hue-rotate(90deg)}40%{transform:translate(7px,-4px);filter:invert(.8)}60%{transform:translate(-5px,-2px);filter:hue-rotate(-90deg)}80%{transform:translate(4px,5px)}100%{transform:translate(0)}}
+@keyframes blink{50%{opacity:.25}}
+@keyframes pulse{from{transform:scale(1.6);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes float{50%{transform:translateY(-8px) rotate(2deg)}}
+@keyframes bl{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+@keyframes grid{to{background-position:0 36px}}
+@keyframes glow{to{box-shadow:0 0 30px #fff,inset 0 0 22px #fff6}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+.t.gold,.t.evil{overflow:hidden}
+.t.gold::after,.t.evil::after{display:none}
+#left .t.gold,#right .t.gold{color:#ffd400;border-color:#ffd400;box-shadow:0 0 16px #ffd400,0 0 40px #ffd400aa,inset 0 0 16px #ffd40088}
+#left .t.evil,#right .t.evil{color:#f03;border-color:#f03;box-shadow:0 0 16px #f03,0 0 36px #f03a}
+svg.em{width:100%;height:100%;padding:14%;box-sizing:border-box}
+.t .em,#duck .em{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2.1rem}
+.t img,#duck img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
+.t.evil img{filter:grayscale(1) brightness(.55) contrast(1.3)}.t.evil .em{filter:grayscale(1) brightness(.5)}
+#duck{position:absolute;top:58%;left:50%;width:68px;height:68px;margin:-34px 0 0 -34px;z-index:2;pointer-events:none;border:3px solid #ffd400;border-radius:50%;overflow:hidden;background:#000;box-shadow:0 0 16px #ffd400,0 0 36px #ffd400aa;transition:left .18s ease-out;animation:bob .5s ease-in-out infinite alternate}
+#duck[hidden]{display:none}
+@keyframes bob{to{transform:translateY(-8px)}}
+.tbox{position:relative;width:100%;margin-top:48px}
+.tbox .win{position:relative;z-index:1;height:160px;overflow:hidden;border:2px solid currentColor;border-radius:10px;background:#000b;display:flex;align-items:center;justify-content:center;box-shadow:0 0 18px currentColor}
+.num{font-size:4.2rem;line-height:1;font-weight:700;font-variant-numeric:tabular-nums;text-shadow:0 0 14px currentColor}
+.num.dim{opacity:.15;filter:blur(3px)}
+.num.show{animation:pulse .5s ease-out}
+.sit{position:absolute;left:calc(50% - 33px);top:-44px;width:66px;height:66px;border:3px solid #ffd400;border-radius:50%;overflow:hidden;background:#000;box-shadow:0 0 14px #ffd400,0 0 30px #ffd400aa;z-index:0;transition:left .55s cubic-bezier(.3,1.5,.5,1),top .55s cubic-bezier(.3,1.5,.5,1),width .55s cubic-bezier(.3,1.5,.5,1),height .55s cubic-bezier(.3,1.5,.5,1);animation:bob .9s ease-in-out infinite alternate}
+.sit.cover{z-index:2;left:calc(50% - 66px);top:14px;width:132px;height:132px;box-shadow:0 0 24px #ffd400,0 0 56px #ffd400aa}
+.sit .em{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2.2rem}
+.sit.cover .em{font-size:4.4rem}
+.sit img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
+.tabs.op{grid-template-columns:repeat(2,1fr)}
+.tabs.lv{grid-template-columns:repeat(3,1fr)}
+.lbl{position:absolute;top:64px;font-size:.8rem;color:#fffa;pointer-events:none}#left .lbl{left:16px}#right .lbl{right:16px}
+</style>
+</head>
+<body>
+<div id="game">
+  <div class="half" id="left"><div class="score" id="s-left">0</div><div class="lbl" id="l-left"></div></div>
+  <div class="half" id="right"><div class="score" id="s-right">0</div><div class="lbl" id="l-right"></div></div>
+  <div id="mid"></div>
+  <div id="timer">15.0</div>
+  <button class="ghost" id="fin" hidden>FINISH</button>
+  <div id="duck" hidden></div>
+  <div id="ov"></div>
+</div>
+<script>
+(function(){
+"use strict";
+var R=36, PAD=40, HUD=84, PER=2, COL={left:"#00e5ff",right:"#ff2e88"};
+var $=function(i){return document.getElementById(i)};
+var halves={left:$("left"),right:$("right")}, scoreEl={left:$("s-left"),right:$("s-right")};
+var timerEl=$("timer"), ov=$("ov"), fin=$("fin"), duckEl=$("duck");
+var phase="lobby", mode="duel", scores={left:0,right:0}, targets=[], t0=0, tick=null, timers=[];
+var GAME=15000, dur=15, sound=true, botLv=1;
+try{dur=+localStorage.getItem("ns_dur")||15; sound=localStorage.getItem("ns_snd")!=="0"; mode=localStorage.getItem("ns_mode")||"duel"; var lv=localStorage.getItem("ns_lv"); if(lv!==null) botLv=+lv;}catch(e){}
+if(["duel","bot","tap","stop"].indexOf(mode)<0) mode="duel";
+var save=function(){try{localStorage.setItem("ns_dur",dur);localStorage.setItem("ns_snd",sound?1:0);localStorage.setItem("ns_mode",mode);localStorage.setItem("ns_lv",botLv)}catch(e){}};
+
+/* ---------- Web Audio: звуковые эффекты синтезатором, без файлов ---------- */
+var ctx=null;
+function audio(){
+  if(!ctx){var AC=window.AudioContext||window.webkitAudioContext; if(AC) ctx=new AC();}
+  if(ctx&&ctx.state==="suspended") ctx.resume();
+  return ctx;
+}
+function tone(f0,f1,d,type,vol){
+  if(!sound) return;
+  var c=audio(); if(!c) return;
+  var t=c.currentTime, o=c.createOscillator(), g=c.createGain();
+  o.type=type; o.frequency.setValueAtTime(f0,t);
+  o.frequency.exponentialRampToValueAtTime(f1,t+d);        // слайд частоты
+  g.gain.setValueAtTime(vol||.12,t);
+  g.gain.exponentialRampToValueAtTime(.001,t+d);           // затухание без щелчка
+  o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+d);
+}
+var beep=function(s){tone(s==="left"?880:1040,1500,.09,"square")};
+var buzz=function(){tone(160,70,.22,"sawtooth",.16)};
+var click=function(){tone(700,1100,.06,"square",.08)};
+var seq=function(n,gap,type){n.forEach(function(f,i){setTimeout(function(){tone(f,f*1.01,.18,type||"square",.1)},i*gap)})};
+var vib=function(ms){try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}};
+function later(fn,ms){var id=setTimeout(fn,ms); timers.push(id); return id;}
+var raf=0;
+function clearAll(){duckEl.hidden=true; clearInterval(tick); timers.forEach(clearTimeout); timers=[]; cancelAnimationFrame(raf); ov.onpointerdown=null;}
+
+/* ---------- Маскот (SVG; цвета игроков пополам) ---------- */
+function svgMascot(mood){
+  var m=mood==="sad"?"M44 90 Q60 74 76 90":mood==="meh"?"M44 84 L76 84":"M44 80 Q60 96 76 80";
+  return '<svg class="mas" viewBox="0 0 120 120"><defs><linearGradient id="mg" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="120" y2="0"><stop offset=".5" stop-color="#00e5ff"/><stop offset=".5" stop-color="#ff2e88"/></linearGradient></defs>'+
+  '<path d="M60 28V14" stroke="url(#mg)" stroke-width="4"/><circle cx="60" cy="11" r="6" fill="#fff"/>'+
+  '<rect x="18" y="28" width="84" height="72" rx="22" fill="#07070f" stroke="url(#mg)" stroke-width="5"/>'+
+  '<rect x="3" y="54" width="10" height="22" rx="4" fill="#00e5ff"/><rect x="107" y="54" width="10" height="22" rx="4" fill="#ff2e88"/>'+
+  '<g class="eyes"><circle cx="42" cy="60" r="11" fill="#00e5ff"/><circle cx="78" cy="60" r="11" fill="#ff2e88"/><circle cx="45" cy="57" r="4" fill="#fff"/><circle cx="81" cy="57" r="4" fill="#fff"/></g>'+
+  '<path d="'+m+'" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round"/></svg>';
+}
+
+var DUCK="<svg class='em' viewBox='0 0 64 64'><path d='M8 42c0-11 9-17 20-17 12 0 22 7 26 15 3 7-4 15-21 15S8 54 8 42z' fill='#ffd400'/><circle cx='24' cy='21' r='12' fill='#ffd400'/><path d='M13 21L3 26l11 4z' fill='#ff8a00'/><circle cx='22' cy='18' r='2.4' fill='#111'/><path d='M30 40c6 0 12 3 14 8-8 3-16 0-14-8z' fill='#e6b800'/></svg>";
+var MASCOT_URL="mascot.jpg";
+/* Фото маскота поверх SVG; если интернета нет и фото не загрузилось — остаётся SVG-робот */
+function mascot(mood){
+  return '<div class="mw">'+svgMascot(mood)+'<img class="ph" alt="" src="'+MASCOT_URL+'" onerror="this.remove()"></div>';
+}
+duckEl.innerHTML=''+DUCK+'<img alt="" src="'+MASCOT_URL+'" onerror="this.remove()">';
+function updateDuck(){                                      // утка бежит к лидеру
+  var a=scores.left,b=scores.right;
+  duckEl.style.left=(50+42*(a-b)/Math.max(10,a+b))+"%";
+}
+/* «Кря»: пилообразная волна с падающим тоном через полосовой фильтр, два раза подряд */
+function dkHTML(cls){return '<div class="sit '+(cls||"")+'" id="dk">'+DUCK+'<img alt="" src="'+MASCOT_URL+'" onerror="this.remove()"></div>';}
+function quack(p){
+  p=p||1;
+  [0,150].forEach(function(d){setTimeout(function(){
+    if(!sound) return; var c=audio(); if(!c) return;
+    var t=c.currentTime,o=c.createOscillator(),f=c.createBiquadFilter(),g=c.createGain();
+    o.type="sawtooth"; o.frequency.setValueAtTime(420*p,t); o.frequency.exponentialRampToValueAtTime(230*p,t+.12);
+    f.type="bandpass"; f.frequency.value=1100; f.Q.value=3;
+    g.gain.setValueAtTime(.22,t); g.gain.exponentialRampToValueAtTime(.001,t+.14);
+    o.connect(f); f.connect(g); g.connect(c.destination); o.start(t); o.stop(t+.15);
+  },d)});
+}
+function fx(side,x,y,text,col){
+  var p=document.createElement("div"); p.className="pop"; p.textContent=text;
+  p.style.cssText="left:"+x+"px;top:"+y+"px;color:"+(col||(text==="+1"?COL[side]:"#ff3355"));
+  p.addEventListener("animationend",function(){p.remove()}); halves[side].appendChild(p);
+}
+function burst(side,x,y,c){
+  for(var i=0;i<14;i++){
+    var a=i/14*Math.PI*2, d=48+(i%3)*24, s=document.createElement("span");
+    s.className="pt"; s.style.cssText="left:"+(x-3)+"px;top:"+(y-3)+"px;color:"+(c||COL[side])+";--dx:"+Math.cos(a)*d+"px;--dy:"+Math.sin(a)*d+"px";
+    s.addEventListener("animationend",function(e){e.target.remove()}); halves[side].appendChild(s);
+  }
+}
+function setScore(side,d){scores[side]+=d; scoreEl[side].textContent=scores[side]; if(mode==="tap") updateDuck();}
+
+/* ---------- Мишени: на каждой половине всегда ровно PER штук ---------- */
+var progress=function(){return Math.min(1,(performance.now()-t0)/GAME)};
+function spawn(side){
+  // Размер именно этой половины: мишень не выходит за её пределы
+  var r=halves[side].getBoundingClientRect(), m=PAD+R, yMin=HUD+m, x, y, i;
+  for(i=0;i<10;i++){                                        // не накладываем мишени друг на друга
+    x=m+Math.random()*Math.max(0,r.width-2*m); y=yMin+Math.random()*Math.max(0,r.height-yMin-m);
+    if(targets.every(function(t){return t.side!==side||Math.hypot(t.x-x,t.y-y)>2*R+12})) break;
+  }
+  var rnd=Math.random(), kind=rnd<.12?"gold":rnd<.2?"evil":"norm";   // 12% золотая утка, 8% чёрная
+  var life=(1400-500*progress())*(kind==="gold"?.8:1), el=document.createElement("div"); el.className="t"+(kind==="norm"?"":" "+kind);
+  if(kind!=="norm") el.innerHTML=''+DUCK+'<img alt="" src="'+MASCOT_URL+'" onerror="this.remove()">';
+  el.style.cssText="left:"+(x-R)+"px;top:"+(y-R)+"px;animation-duration:"+life+"ms";
+  var t={side:side,x:x,y:y,createdAt:performance.now(),life:life,el:el,kind:kind};
+  el.addEventListener("pointerdown",function(e){hit(e,t)});
+  halves[side].appendChild(el); targets.push(t);
+}
+function refill(){                                          // исчезла мишень — сразу появляется новая
+  ["left","right"].forEach(function(s){
+    var n=targets.filter(function(t){return t.side===s}).length;
+    for(;n<PER;n++) spawn(s);
+  });
+}
+
+/* ---------- Тапы: только pointerdown, каждая половина — свой игрок ---------- */
+function hit(e,t){
+  e.stopPropagation();
+  if(phase!=="playing"||targets.indexOf(t)<0) return;
+  if(mode==="bot"&&t.side==="right"&&!e.bot) return;
+  targets.splice(targets.indexOf(t),1); t.el.remove();
+  if(t.kind==="evil"){                                       // чёрная утка: штраф. Если дать ей уйти — штрафа нет
+    setScore(t.side,-2); fx(t.side,t.x,t.y,"\u22122","#f03"); quack(.55); glitchHalf(t.side); if(!e.bot) vib(120);
+  } else {
+    var v=t.kind==="gold"?3:1, gc=t.kind==="gold"?"#ffd400":null;
+    setScore(t.side,v); burst(t.side,t.x,t.y,gc); fx(t.side,t.x,t.y,"+"+v,gc); t.kind==="gold"?quack(1.25):beep(t.side); if(!e.bot) vib(50);
+  }
+  refill();
+}
+/* ---------- Бот: играет за правую половину ---------- */
+var LV=[{d:[900,1250],skip:.35,ev:.5,miss:.012},   // лёгкий
+        {d:[650,1000],skip:.2,ev:.85,miss:.005},   // средний
+        {d:[450,700],skip:.12,ev:1,miss:.002}];    // хард
+function botThink(){
+  var L=LV[botLv];
+  targets.forEach(function(t){
+    if(t.side!=="right"||t.bot) return; t.bot=true;          // каждую мишень бот «замечает» один раз
+    var skip=t.kind==="evil"?Math.random()<L.ev:Math.random()<L.skip*(t.kind==="gold"?.3:1);  // чёрную утку бот обычно обходит
+    var d=L.d[0]+Math.random()*(L.d[1]-L.d[0]);              // время реакции
+    if(skip||d>t.life-120) return;
+    later(function(){ if(phase==="playing"&&targets.indexOf(t)>=0) hit({stopPropagation:function(){},bot:true},t); },d);
+  });
+  if(Math.random()<L.miss){                                  // иногда бот промахивается
+    var r=halves.right.getBoundingClientRect();
+    setScore("right",-1); fx("right",40+Math.random()*(r.width-80),HUD+60+Math.random()*(r.height-HUD-120),"\u22121"); glitchHalf("right");
+  }
+}
+function glitchHalf(side){var h=halves[side]; h.classList.remove("glitch"); void h.offsetWidth; h.classList.add("glitch"); later(function(){h.classList.remove("glitch")},360);}
+function miss(side,e){
+  if(phase!=="playing") return;
+  if(mode==="bot"&&side==="right") return;
+  var r=halves[side].getBoundingClientRect(), h=halves[side];
+  if(mode==="tap"){                                         // тапалка: каждое касание = +1, любой палец
+    setScore(side,1); vib(10); tone(480+(scores[side]%12)*40,700+(scores[side]%12)*40,.04,"square",.06);
+    var rp=document.createElement("span"); rp.className="rp"; rp.style.cssText="left:"+(e.clientX-r.left)+"px;top:"+(e.clientY-r.top)+"px;color:"+COL[side];
+    rp.addEventListener("animationend",function(){rp.remove()}); h.appendChild(rp); return;
+  }
+  setScore(side,-1); fx(side,e.clientX-r.left,e.clientY-r.top,"\u22121"); buzz();
+  h.classList.remove("glitch"); void h.offsetWidth; h.classList.add("glitch");
+  later(function(){h.classList.remove("glitch")},360);
+}
+["left","right"].forEach(function(s){halves[s].addEventListener("pointerdown",function(e){miss(s,e)})});
+
+/* ---------- Режимы «Дуэль» и «Без конца» ---------- */
+function clearField(){targets.forEach(function(t){t.el.remove()}); targets=[]; document.querySelectorAll(".pt,.pop,.rp").forEach(function(n){n.remove()});}
+function begin(){
+  phase="playing"; ov.className="off"; ov.innerHTML=""; t0=performance.now(); fin.hidden=true; duckEl.hidden=mode!=="tap"; updateDuck();
+  if(mode==="duel"||mode==="bot") refill();
+  var lastSec=-1;
+  tick=setInterval(function(){
+    var now=performance.now(), el=now-t0, left=Math.max(0,GAME-el);
+    timerEl.textContent=(left/1000).toFixed(1); timerEl.classList.toggle("hot",left<=5000);
+    var s=Math.ceil(left/1000); if(left<=5000&&left>0&&s!==lastSec){lastSec=s; tone(1000,1000,.07,"square",.1);}
+    var keep=targets.filter(function(t){ if(now-t.createdAt<t.life) return true; t.el.remove(); return false; });
+    if(keep.length!==targets.length){targets=keep; refill();}   // просрочено: без штрафа, сразу новая
+    if(mode==="bot"&&phase==="playing") botThink();
+    if(left<=0) end();
+  },50);
+}
+function end(){
+  clearAll(); phase="over"; clearField(); fin.hidden=true; timerEl.classList.remove("hot");
+  var w=scores.left>scores.right?"left":scores.right>scores.left?"right":null;
+  if(w) seq([523,659,784,1047,1319],110); else seq([440,440],160,"triangle");
+  result(w,'<div class="vs"><span style="color:'+COL.left+'">'+scores.left+'</span><span style="color:#fff6"> : </span><span style="color:'+COL.right+'">'+scores.right+'</span></div>',start);
+}
+function result(w,body,again){
+  var col=w?COL[w]:"#fff"; setTimeout(function(){quack(w?1:.75)},500);
+  ov.className="";
+  ov.innerHTML='<div class="card box" style="color:'+col+';border-color:'+col+'">'+mascot(w?"happy":"meh")+'<div class="res">'+(w?(mode==="bot"?(w==="left"?"ТЫ ПОБЕДИЛ":"БОТ ПОБЕДИЛ"):"PLAYER "+(w==="left"?1:2)+" WINS"):"DRAW")+'</div>'+body+'<p>'+(w?(mode==='bot'?(w==='left'?'Утка выбрала тебя.':'Утка выбрала бота.'):'Утка выбрала PLAYER '+(w==='left'?1:2)+'.'):'Утка не смогла выбрать.')+'</p>'+
+    '<div class="row"><button id="again">PLAY AGAIN</button><button class="ghost" id="menu">МЕНЮ</button></div></div>';
+  $("again").onclick=function(){click();again()}; $("menu").onclick=function(){click();lobby()};
+}
+function start(){
+  audio(); clearAll(); clearField(); GAME=dur*1000; fin.hidden=true;
+  scores={left:0,right:0}; scoreEl.left.textContent=scoreEl.right.textContent="0"; timerEl.textContent=dur+".0";
+  $("l-left").textContent=mode==="bot"?"ТЫ":""; $("l-right").textContent=mode==="bot"?"БОТ":"";
+  phase="countdown"; ov.className="cd";
+  ["3","2","1","GO!"].forEach(function(n,i){ later(function(){
+    ov.innerHTML='<div class="big">'+n+'</div>'; n==="GO!"?(tone(520,1600,.3,"square"),vib(80)):tone(520,520,.1,"square",.1);
+  },i*1000); });
+  later(begin,3600);
+}
+fin.addEventListener("pointerdown",function(e){e.stopPropagation(); if(phase==="playing"){click(); end();}});
+
+/* ---------- Режим «Точное время»: по очереди, одна и та же цель ---------- */
+var tgt=0, res=[], turn=0;
+function stopStart(){
+  audio(); clearAll(); clearField(); fin.hidden=true; timerEl.textContent=""; phase="stop";
+  tgt=Math.round((5+Math.random()*10)*100)/100; res=[]; turn=0; prep();
+}
+function prep(){
+  var c=turn?COL.right:COL.left; ov.className="";
+  ov.innerHTML='<div class="card box" style="color:'+c+';border-color:'+c+'"><div class="res">PLAYER '+(turn+1)+'</div><p>Остановите таймер ровно на</p><div class="big" style="font-size:3.8rem">'+tgt.toFixed(2)+'</div>'+
+    '<p>Таймер идёт 2 секунды и исчезает. Считайте сами и нажмите в любое место экрана.</p><button id="rd">ГОТОВ</button></div>';
+  $("rd").onclick=function(){click();run();};
+}
+function run(){
+  var c=turn?COL.right:COL.left, s=performance.now(), lock=s+400;
+  ov.className=""; 
+  var shut=false;
+  ov.innerHTML='<div class="card" style="color:'+c+'"><p>Цель</p><div class="res">'+tgt.toFixed(2)+'</div><div class="tbox"><div class="win"><div class="num" id="st">0.00</div></div>'+dkHTML()+'</div><p id="hint">Нажмите, когда время дойдёт до цели</p></div>';
+  function stop(){
+    var e=(performance.now()-s)/1000; cancelAnimationFrame(raf); ov.onpointerdown=null; res[turn]=e; reveal(e);
+  }
+  (function frame(){
+    var e=(performance.now()-s)/1000, st=$("st"); if(!st) return;
+    if(e<2) st.textContent=e.toFixed(2);
+    else if(!shut){                                         // через 2 секунды утка прыгает на ящик и закрывает таймер крышкой
+      shut=true; st.textContent="?.??"; st.classList.add("dim"); $("dk").classList.add("cover");   // утка прыгает на таймер и закрывает его
+      $("hint").textContent="Время спрятано. Считайте сами"; tone(160,50,.18,"square",.16); quack(1.1);
+    }
+    if(e>tgt+10) return stop();
+    raf=requestAnimationFrame(frame);
+  })();
+  ov.onpointerdown=function(){ if(performance.now()>=lock){tone(900,900,.05,"square",.1); stop();} };
+}
+function reveal(e){
+  var c=turn?COL.right:COL.left, d=e-tgt, ad=Math.abs(d), ok=ad<.1;
+  ok?(seq([784,1047,1319],90),setTimeout(function(){quack(1.3)},300)):(tone(300,200,.25,"triangle",.14),quack(.6));
+  ov.innerHTML='<div class="card box" style="color:'+c+';border-color:'+c+'"><div class="res">'+(ad<.03?"УТКА В ВОСТОРГЕ!":ok?"УТКА ДОВОЛЬНА":"УТКА В ШОКЕ")+'</div>'+
+    '<div class="tbox"><div class="win"><div class="num show">'+e.toFixed(2)+'</div></div>'+dkHTML()+'</div><p>Цель '+tgt.toFixed(2)+' · разница '+(d>0?"+":"\u2212")+ad.toFixed(2)+' сек</p>'+
+    '<button id="nx">'+(turn?"РЕЗУЛЬТАТ":"ДАЛЬШЕ")+'</button></div>';
+  $("nx").onclick=function(){click(); if(turn===0){turn=1;prep();} else final();};
+}
+function final(){
+  var d0=Math.abs(res[0]-tgt), d1=Math.abs(res[1]-tgt), w=Math.abs(d0-d1)<.005?null:d0<d1?"left":"right";
+  seq(w?[523,659,784,1047]:[440,440],110);
+  result(w,'<p>Цель '+tgt.toFixed(2)+'</p><div class="vs"><span style="color:'+COL.left+'">'+res[0].toFixed(2)+' ('+d0.toFixed(2)+')</span><br><span style="color:'+COL.right+'">'+res[1].toFixed(2)+' ('+d1.toFixed(2)+')</span></div>',stopStart);
+}
+
+/* ---------- Главное меню ---------- */
+var MODES=[["bot","ПРОТИВ БОТА","Ты слева, бот справа. Мишени как в дуэли: золотая утка +3, чёрная −2. Выбери сложность."],["duel","ДУЭЛЬ","Бейте мишени. Золотая утка даёт +3, чёрная утка даёт −2: её не трогайте. Побеждает самый меткий."],
+           ["tap","ТАПАЛКА","Утка бежит к тому, кто тапает быстрее. К кому она прибежит к концу раунда, тот и победил."],
+           ["stop","ТОЧНОЕ ВРЕМЯ","Утка прячет таймер. Остановите его на нужной цифре. Играют по очереди."]];
+function lobby(){
+  clearAll(); clearField(); phase="lobby"; ov.className=""; fin.hidden=true; timerEl.textContent=mode==="stop"?"":dur+".0";
+  var cur=MODES.filter(function(m){return m[0]===mode})[0];
+  ov.innerHTML='<div class="card">'+mascot()+'<h1>NEON<br>SMASH</h1><p>Киберутка Квак украла чип у двух хакеров. Она достанется самому ловкому.</p>'+
+    '<div class="tabs">'+MODES.filter(function(m){return m[0]!=="bot"}).map(function(m){return '<button data-m="'+m[0]+'" class="'+(m[0]===mode||(m[0]==="duel"&&mode==="bot")?"on":"")+'">'+m[1]+'</button>'}).join("")+'</div><p>'+cur[2]+'</p>'+
+    ((mode==="duel"||mode==="bot")?'<div class="tabs op"><button data-o="duel" class="'+(mode==="duel"?"on":"")+'">С ДРУГОМ</button><button data-o="bot" class="'+(mode==="bot"?"on":"")+'">С БОТОМ</button></div>':"")+
+    (mode==="bot"?'<div class="tabs lv">'+["ЛЁГКИЙ","СРЕДНИЙ","ХАРД"].map(function(n,i){return '<button data-l="'+i+'" class="'+(i===botLv?"on":"")+'">'+n+'</button>'}).join("")+'</div>':"")+
+    (mode!=="stop"?'<div class="set"><label>Время раунда: <b id="dv">'+dur+'</b> сек</label><input id="rg" type="range" min="10" max="60" step="5" value="'+dur+'"></div>':"")+
+    '<button id="go">START GAME</button><button class="ghost" id="snd">Звук: '+(sound?"вкл":"выкл")+'</button></div>';
+  Array.prototype.forEach.call(ov.querySelectorAll(".tabs:not(.lv):not(.op) button"),function(b){b.onclick=function(){if(!(b.dataset.m==="duel"&&mode==="bot")) mode=b.dataset.m; save(); click(); lobby();}});
+  Array.prototype.forEach.call(ov.querySelectorAll(".lv button"),function(b){b.onclick=function(){botLv=+b.dataset.l; save(); click(); lobby();}});
+  Array.prototype.forEach.call(ov.querySelectorAll(".op button"),function(b){b.onclick=function(){mode=b.dataset.o; save(); click(); lobby();}});
+  $("go").onclick=function(){click(); mode==="stop"?stopStart():start();};
+  if($("rg")) $("rg").oninput=function(e){dur=+e.target.value; $("dv").textContent=dur; timerEl.textContent=dur+".0"; tone(300+dur*9,300+dur*9,.04,"square",.07); save();};
+  $("snd").onclick=function(e){sound=!sound; e.target.textContent="Звук: "+(sound?"вкл":"выкл"); save(); click();};
+}
+ov.addEventListener("pointerdown",function(e){e.stopPropagation()});
+document.addEventListener("contextmenu",function(e){e.preventDefault()});
+lobby();
+})();
+</script>
+</body>
+</html>
