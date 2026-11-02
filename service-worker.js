@@ -1,4 +1,4 @@
-const CACHE = 'nexus-v3';
+const CACHE = 'nexus-v4';
 const FILES = ['./','index.html','manifest.json','mascot.jpg','icon-192.png','icon-512.png',
  'neon-puzzle.html','water-sort.html','sudoku.html','sapper.html','wordle.html','tictactoe.html',
  'archers.html','knife-hit.html','neon-smash.html','car-ride.html','sandbox.html','cheatsheet.html',
